@@ -66,21 +66,27 @@ class AE(nn.Module):
 		self.batch_size = config.batch_size
 		self.batch_flag = False
 		self.batch_index = 0
+
+		#RACHEL: Set parameters for keeping track of the metrics
 		self.global_train_loss = 0.0
 		self.global_valid_loss = 0.0
 		self.best_valid_loss = 999.999
 		self.best_valid_flag = False
 
+		#RACHEL: create another instances of AE? Give acess to AE code?
 		super(AE, self).__init__()
 
+		#RACHEL:Create the encoding layers - 2 linear layers 1 of size defined, and the second of size 128 (reduced feature number)
 		self.encode = nn.Sequential(
 			nn.Linear(self.num_features, config.hidden_nodes),
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate),
-			nn.Linear(config.hidden_nodes, 128),
+			nn.Linear(config.hidden_nodes, 128), #***RACHEL: THIS IS A PARAMETER MAY WANT TO CHANGE (need to change in decoding layer too)
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
+
+		#RACHEL: Create a decoding layer - symmetric to encoding layer
 		self.decode = nn.Sequential(
 			nn.Linear(128, config.hidden_nodes),
 			acti_func_dict[config.acti_func],
@@ -88,12 +94,14 @@ class AE(nn.Module):
 			nn.Linear(config.hidden_nodes, self.num_features)
 		)
 
+		#RACHEL: Save the variables and information used
 		self.hp = 'hn_{}_af_{}_ms_{}_mt_{}_vd_{}'.format(config.hidden_nodes,
 			config.acti_func,
 			config.model_struct,
 			config.model_type,
-			config.vae_data)
+			config.vae_data) #RACHEL:***is this meant to be vae_data?
 		try:
+			#RACHEL:Save the results to results/{model name}/{session_name}
 			with open(self.save_path + 'best_loss.txt', "r") as fr:
 				for line in fr.readlines():
 					l = line.split('\t')
@@ -103,11 +111,13 @@ class AE(nn.Module):
 			with open(self.save_path + 'best_loss.txt', "w") as fw:
 				fw.write(self.hp + '\t999.999')
 
+    #RACHEL: write the best loss to saved file
 	def write_best_loss(self):
 		file_name = self.save_path + 'best_loss.txt'
 		with open(file_name, "w") as fw:
 			fw.write('{}\t{}'.format(self.hp, self.best_valid_loss))
 
+	#RACHEL: initialize the weights for the layers using xavier_normal weight initialization (**may want to change this?)
 	def init_layers(self):
 		nn.init.xavier_normal_(self.encode[0].weight.data)
 		nn.init.xavier_normal_(self.decode[0].weight.data)
@@ -122,15 +132,18 @@ class AE(nn.Module):
 		except:
 			pass
 
+    #RACHEL: Calculate the L1_norm loss from based on the parameters
 	def _l1_norm(self, model):
 		l1_loss = 0.0
 		for param in model.parameters():
 			l1_loss += torch.sum(torch.abs(param))
 		return self.weight_sparsity * l1_loss
 
+    #RACHEL: perform the dimensionality reduction (encode layers)
 	def dimension_reduction(self, x):
 		return self.encode(x)
 
+    #RACHEL: perform a foward pass of the data with params x (data), m, and coo
 	def forward(self, x, m=None, coo=None):
 		z = self.encode(x)
 		recon = self.decode(z)
@@ -142,6 +155,7 @@ class AE(nn.Module):
 		else:
 			return get_mse_loss_masked(recon, x, m)
 
+    #RACHEL:switch the device to CPU
 	def _switch_device(self, a, b):
 		cpu_device = torch.device("cpu")
 		gpu_device = self.device_type
@@ -149,41 +163,60 @@ class AE(nn.Module):
 		b = b.to(gpu_device)
 		return a, b
 
+	#RACHEL: fit the training data (using validation set as well) for the AE
 	def fit(self, trainset, validset=None):
+		#RACHEL:initialize the layers
 		self.init_layers()
+		#RACHEL:use the appropriate device type
 		model = self.to(self.device_type)
+		#RACHEL:print the model information
 		print(model)
+		#RACHEL:get the optimizer and set parameters based on those defined at the beginning of the class
 		optimizer = get_optimizer(self.opti_name)(model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+		#RACHEL:print the optimizer information
 		print(optimizer)
+		#RACHEL:determine the number of batches needed for the training and validation data based on provided batch_size
 		batch_num = int(trainset.num_samples / self.batch_size) if self.batch_size != 0 else 1
 		batch_val = int(validset.num_samples / self.batch_size) if self.batch_size != 0 else 1
 
+		#RACHEL:set each epoch
 		t = trange(self.max_epochs + 1, desc='Training...')
 		for epoch in t:
 			self.batch_flag = False
+			#RACHEL:train the given model???
 			model.train()
+			#RACHEL:if using batches
 			if self.batch_size != 0:
 				# BATCH-WISE TRAINING PHASE
 				self.global_train_loss, self.global_valid_loss = 0.0, 0.0
+				#RACHEL:train one batch at a time
 				for b in range(batch_num):
+					#RACHEL:calculate indices for the batch
 					i, j = (self.batch_size * b) % trainset.num_samples, (self.batch_size * (b+1)) % trainset.num_samples
+					#RACHEL:train the model for the batch and calculate the loss
 					model.train()
+					#RACHEL:Define a model with only btach data
 					loss = model(trainset.X[i:j,:], trainset.m[i:j,:], trainset.coo)
 					assert torch.isnan(loss).sum().sum() != 1
+					#RACHEL:keep track of the global training loss
 					self.global_train_loss += loss.item() * self.batch_size
 					optimizer.zero_grad()
 					loss += self._l1_norm(model)
+					#RACHEL:compute gradients
 					loss.backward()
+					#RACHEL:update the parameters
 					optimizer.step()
 				self.batch_flag = False
 				lb = trainset.num_samples % self.batch_size
 				loss = model(trainset.X[:-b,:], trainset.m[:-b,:], None)
 				loss += self._l1_norm(model)
+				#RACHEL: compite gradients
 				loss.backward()
+				#RACHEL:update parameters
 				optimizer.step()
 				assert torch.isnan(loss).sum().sum() != 1
 				self.global_train_loss += loss.item() * lb
-			else:
+			else: #RACHEL: same comments as above apply
 				# FULL_BATCH TRAINING PHASE
 				loss = model(trainset.X, trainset.m, None)
 				assert torch.isnan(loss).sum().sum() != 1
@@ -229,13 +262,18 @@ class AE(nn.Module):
 			t.set_description('(Training: %g)' % float(math.sqrt(self.global_train_loss)) + '(Validation: %g)' % float(math.sqrt(self.global_valid_loss)))
 		return model
 
+	#RACHEL:test the model (check encoding + decoding)
 	def predict(self, dataset, model):
 		self.batch_flag = False
 		loss = 0.0
+		#RACHEL:determine how many batches needed
 		batch_val = int(dataset.num_samples / self.batch_size) if self.batch_size != 0 else dataset.num_samples
+		#RACHEL:define model
 		model = self.to(self.device) if model is None else model
-		with torch.no_grad():
+		with torch.no_grad(): #RACHEL:test
+			#RACHEL: put the model into evaluation mode (turn off dropout etc.)
 			model.eval()
+			#RACHEL: evaluate in batches or altogether
 			if self.batch_size != 0:
 				for b in range(batch_val):
 					i, j = (self.batch_size * b) % dataset.num_samples, (self.batch_size * (b+1)) % dataset.num_samples
@@ -249,11 +287,13 @@ class AE(nn.Module):
 			else:
 				vloss = model(dataset.X, dataset.m, None)
 				loss = vloss.item()
+		#RACHEL:return average loss
 		if self.batch_size != 0:
 			return loss / dataset.num_samples
 		else:
 			return loss
 
+	#RACHEL:perform both training and testing phases
 	def fit_predict(self, trainset, validset, testset):
 		print("--------TRAINING--------")
 		model = self.fit(trainset, validset)
@@ -261,28 +301,36 @@ class AE(nn.Module):
 		if self.save_mode:
 			SAVE_PATH = self.save_path + 'final_model'
 			self.LOGGER.info('Saving Model....')
+			#RACHEL:save the final model as a dictionary
 			torch.save({'model_state_dict': model.state_dict()}, SAVE_PATH)
 		print("---------TESTING---------")
+		#RACHEL:return the testing results
 		return self.predict(testset, model)
 
+#RACHEL: create the VAE class - called with AE as parameters
 class VAE(AE):
+	#RACHEL: initialize the VAE
 	def __init__(self, config, logger, num_features=20531):
 		super().__init__(config, logger, num_features)
+		#RACHEL:create encoding layer(1 linear, with dropout)
 		self.encode = nn.Sequential(
 			nn.Linear(self.num_features, config.hidden_nodes),
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
+		#RACHEL: create encoding mu layer (1 linear with dropout)
 		self.encode_mu = nn.Sequential(
-			nn.Linear(config.hidden_nodes, 128),
+			nn.Linear(config.hidden_nodes, 128), #RACHEL:**may want to change dim here
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
+		#RACHEL:create encoding si layer (1 linear with dropout)
 		self.encode_si = nn.Sequential(
-			nn.Linear(config.hidden_nodes, 128),
+			nn.Linear(config.hidden_nodes, 128), #RACHEL:may want to change dim here
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
+		#create the deconding layer (2 linear layers with dropout in between - symmetric to encoding layer)
 		self.decode = nn.Sequential(
 			nn.Linear(128, config.hidden_nodes),
 			acti_func_dict[config.acti_func],
@@ -290,7 +338,9 @@ class VAE(AE):
 			nn.Linear(config.hidden_nodes, num_features)
 		)
 
+	#RACHEL:perform dimensionality reduction
 	def dimension_reduction(self, x, coo):
+		#RACHEL:coo means to perform topological conversion?????
 		if coo is None:
 			h = self.encode(x)
 			mu = self.encode_mu(h)
@@ -301,26 +351,31 @@ class VAE(AE):
 			mu = self.encode_mu(h)
 			return mu
 
+	#RACHEL:find std and eps given mu and log variaiton for VAE
 	def _reparameterize(self, mu, logvar):
 		std = torch.exp(0.5 * logvar)
 		eps = torch.randn_like(std)
 		assert not torch.isnan(std).any() and not torch.isnan(eps).any()
 		return eps.mul(std).add_(mu)
 
+	#RACHEL:forward pass of the data
 	def forward(self, x, m=None, coo=None):
+		#RACHEL:encodedong portion
 		h = self.encode(x)
 		mu = self.encode_mu(h)
 		logvar = self.encode_si(h)
 		z = self._reparameterize(mu, logvar)
+		#RACHEL:decoding portion
 		recon = self.decode(mu)
 		x = x * m if self.exclude_imp else x
 		recon = recon if self.exclude_imp else recon
-
+		#RACHEL:calculate k-fold loss? --> function in vae_utils
 		if not self.exclude_imp:
 			return get_mse_kld_loss(recon, x, mu, logvar)
 		else:
 			return get_mse_kld_loss_masked(recon, x, mu, logvar, m)
 
+#RACHEL: NOT USING THIS ONE FOR PROJECT******************************************
 class DAE(AE):
 	def __init__(self, config, logger, num_features=20531):
 		super().__init__(config, logger, num_features)

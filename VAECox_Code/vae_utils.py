@@ -23,36 +23,44 @@ import sys
 import random
 np.set_printoptions(threshold=sys.maxsize)
 
+#RACHEL: Define the dictionary of cancer TCGA data (currently dummy data). Defines the dataset names according to TCGA codes
 cancer_list_dict = {
     'ching': ['BLCA', 'BRCA', 'HNSC', 'KIRC', 'LGG', 'LIHC', 'LUAD', 'LUSC', 'OV', 'STAD'],
-    'wang': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'ESCA', 'HNSC', 'KIRC', 'KIRP', 
+    'wang': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'ESCA', 'HNSC', 'KIRC', 'KIRP',
              'LGG', 'LIHC', 'LUAD', 'LUSC', 'MESO', 'PAAD', 'SARC', 'SKCM', 'STAD', 'UCEC', 'UCS'],
-    'all': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 
-            'HNSC', 'KICH', 'KIPAN', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD', 'LUSC', 
-            'MESO', 'OV', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'STES', 
+    'all': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM',
+            'HNSC', 'KICH', 'KIPAN', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD', 'LUSC',
+            'MESO', 'OV', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'STES',
             'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS']
 }
 
+#RACHEL: Pull out the values for the requested dataset
 def cancer_list(key):
     return cancer_list_dict[key]
 
+#RACHEL: Access the dataset
 def get_dataset_811(config):
+    #RACHEL:initialize data dictionary for training, validation, testing, and coo
     data_dict = {
         'train': dict(),
         'valid': dict(),
         'test': dict(),
         'coo': dict()
     }
-    WHAT_OMICS = "_".join(config.omic_list)
-    ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS)
+    WHAT_OMICS = "_".join(config.omic_list) #RACHEL: omic_list is option in config
+    ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
     MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
     PICKLE_PATH = "./data/{0}_811_{1}_{2}_{3}_{4}_{5}.pickle".format(config.vae_data, config.gcn_mode, config.feature_scaling, config.feature_selection, config.sub_graph, WHAT_OMICS)
-
+        ##RACHEL:**may just eb able to change to match pickle name
+    #RACHEL: if the path has not been made yet, make one
     if not os.path.isfile(PICKLE_PATH):
         print("Making new pickle file...")
         # Missing Value Handling
+        #RACHEL: read the original file*****
         df = pd.read_csv(ORIGINAL_FILE, sep="\t", header=0, index_col=0)
+        #RACHEL: read the masking file********
         mf = pd.read_csv(MASKING_FILE, sep=",", header=0, index_col=0)
+        #RACHEL: re-index labels
         mf = mf.reindex(df.index)
         print(df.index)
         print(mf.index)
@@ -67,11 +75,13 @@ def get_dataset_811(config):
         df_train = df.loc[df['Fold@811'] == 0]
         df_valid = df.loc[df['Fold@811'] == 1]
         df_test = df.loc[df['Fold@811'] == 2]
-
+        print("***printing columns***")
+        # print(df_train.columns())
+        #RACHEL: get the data and labels???
         for omic in config.omic_list:
-            data_dict['train'][omic] = df_train[[x for x in df_train.columns.get_values() if omic in x]]
-            data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns.get_values() if omic in x]]
-            data_dict['test'][omic] = df_test[[x for x in df_test.columns.get_values() if omic in x]]
+            data_dict['train'][omic] = df_train[[x for x in df_train.columns if omic in x]] #RACHEL: eliminated get_values()
+            data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns if omic in x]]
+            data_dict['test'][omic] = df_test[[x for x in df_test.columns if omic in x]]
             data_dict['train'][omic + '_mask'] = mf.loc[df_train.index]
             data_dict['valid'][omic + '_mask'] = mf.loc[df_valid.index]
             data_dict['test'][omic + '_mask'] = mf.loc[df_test.index]
@@ -93,11 +103,14 @@ def get_dataset_811(config):
         data_dict = _feature_scaling(config, data_dict)
 
         with open(PICKLE_PATH, "wb") as handle:
+            #RACHEL: write to file level
             pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     with open(PICKLE_PATH, "rb") as handle:
+        #RACHEL: read from file
         data_dict = pickle.load(handle)
-    
+
+    #RACHEL: for each dataset print number of samples in train, validate, and test
     for o in config.omic_list:
         print('Train', o, data_dict['train'][o].shape)
         print('Valid', o, data_dict['valid'][o].shape)
@@ -106,11 +119,12 @@ def get_dataset_811(config):
 
     return data_dict
 
+##RACHEL: perform feature selection????
 def _feature_selection(config, data_dict):
     if 'None' not in config.feature_selection:
         selected_genes = []
         for omic in config.omic_list:
-            old_genes = data_dict['train'][omic].columns.get_values()
+            old_genes = data_dict['train'][omic].columns.get_values() #RACHEL*****MAY NEED TO DELETE GET_VALUES******
             temp_genes = [g.split("|")[0] for g in old_genes]
             print(temp_genes)
             with open('./data/{}_genes.txt'.format(config.feature_selection), "r") as fr:
@@ -126,11 +140,12 @@ def _feature_selection(config, data_dict):
                     data_dict[mode][omic + '_mask'] = data_dict[mode][omic + '_mask'][selected_genes]
     return data_dict
 
+#RACHEL:perform feature scaling ***I MAY NOT WANT TO INCLUDE THIS*********
 def _feature_scaling(config, data_dict):
     if 'None' not in config.feature_scaling:
         for key in data_dict['train'].keys():
             if 'Cli@' not in key and '_mask' not in key:
-                scaler = StandardScaler() 
+                scaler = StandardScaler()
                 if config.feature_scaling == 'z':
                     scaler = StandardScaler()
                 elif config.feature_scaling == 'minmax':
@@ -176,6 +191,7 @@ class Torch_Dataset:
             valid_y[c] = self.y[c][valid_index]
             valid_c[c] = self.c[c][valid_index]
             valid_m[c] = self.m[c][valid_index]
+        #RACHEL: WHAT IS X,Y,C,M????? --> MAY NEED TO RE-WRITE CODE ANYWAYS DUE TO DIFFERENCE IN DATA
         train_dataset = Torch_Dataset(train_x, train_y, train_c, train_m)
         valid_dataset = Torch_Dataset(valid_x, valid_y, valid_c, valid_m)
         return train_dataset, valid_dataset
@@ -196,7 +212,7 @@ def torchify_vaeserin(config):
     train_dataset = Torch_Dataset(x, None, None, m)
     valid_dataset = Torch_Dataset(xx, None, None, mm)
     test_dataset = Torch_Dataset(xxx, None, None, mmm)
-    
+
     return train_dataset, valid_dataset, test_dataset, num_cols
 
 def get_mse_loss_masked(recon_x, x, m):
@@ -229,9 +245,10 @@ def get_evaluations(recon_x, x):
     r2 = r2_score(pred, true)
     mse = mean_squared_error(pred, true)
     mae = mean_absolute_error(pred, true)
-    float_list = [evs, r2, mse, mae] 
+    float_list = [evs, r2, mse, mae]
     return ["%.3f"%item for item in float_list]
 
+#RACHEL: NOT USED FOR THIS PROJECT (survival prediction)**********************************
 def get_cindex(y, y_pred, c):
     try:
         return cindex(y, y_pred, c)
