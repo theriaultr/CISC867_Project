@@ -250,7 +250,7 @@ class AE(nn.Module):
 						self.global_train_loss /= trainset.num_samples
 						self.global_valid_loss /= validset.num_samples
 
-					# SAVE BEST MODEL
+					# SAVE BEST MODEL***********
 					SAVE_PATH = '{}best_model'.format(self.save_path)
 					if self.save_mode and (self.global_valid_loss < self.best_valid_loss):
 						self.best_valid_loss = float(self.global_valid_loss)

@@ -48,11 +48,14 @@ def get_dataset_811(config):
         'coo': dict()
     }
     WHAT_OMICS = "_".join(config.omic_list) #RACHEL: omic_list is option in config
+    #RACHEL:original file contains left column of id, top row gene name< following rows normalized gene data
     ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
+    #RACHEL: this file contains left column patient id, top row genes< following rows whether or not gene is included
     MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
+    #RACHEL: develop the pickle file oath name based on run_time system information
     PICKLE_PATH = "./data/{0}_811_{1}_{2}_{3}_{4}_{5}.pickle".format(config.vae_data, config.gcn_mode, config.feature_scaling, config.feature_selection, config.sub_graph, WHAT_OMICS)
         ##RACHEL:**may just eb able to change to match pickle name
-    #RACHEL: if the path has not been made yet, make one
+    #RACHEL: if the pickle file has not been made yet, make one
     if not os.path.isfile(PICKLE_PATH):
         print("Making new pickle file...")
         # Missing Value Handling
@@ -60,8 +63,10 @@ def get_dataset_811(config):
         df = pd.read_csv(ORIGINAL_FILE, sep="\t", header=0, index_col=0)
         #RACHEL: read the masking file********
         mf = pd.read_csv(MASKING_FILE, sep=",", header=0, index_col=0)
-        #RACHEL: re-index labels
+        #RACHEL: re-index labels so match order
         mf = mf.reindex(df.index)
+        print("printing index**********************************:")
+        #RACHEL:this prints the patient ID information (row names) **comment out when run
         print(df.index)
         print(mf.index)
         # mf = mf.replace(0,np.nan)
@@ -72,16 +77,27 @@ def get_dataset_811(config):
         df.fillna(0.0, axis=1, inplace=True)
 
         # Dataset Split Train, Valid and Test
+        temp =df['Fold@811']
+        print("printing Fold@811")
+        print(temp)
         df_train = df.loc[df['Fold@811'] == 0]
+        print("training index:")
+        print(df_train.index)
         df_valid = df.loc[df['Fold@811'] == 1]
+        print("valid index:")
+        print(df_valid.index)
         df_test = df.loc[df['Fold@811'] == 2]
-        print("***printing columns***")
-        # print(df_train.columns())
+        print("test index:")
+        print(df_test.index)
+
+        # print(df_train.columns)
         #RACHEL: get the data and labels???
         for omic in config.omic_list:
+            #RACHEL: pull out gene information (mRNA expression)
             data_dict['train'][omic] = df_train[[x for x in df_train.columns if omic in x]] #RACHEL: eliminated get_values()
             data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns if omic in x]]
             data_dict['test'][omic] = df_test[[x for x in df_test.columns if omic in x]]
+            #RACHEL:pull out mask (whether or not to include gene)
             data_dict['train'][omic + '_mask'] = mf.loc[df_train.index]
             data_dict['valid'][omic + '_mask'] = mf.loc[df_valid.index]
             data_dict['test'][omic + '_mask'] = mf.loc[df_test.index]
@@ -99,7 +115,7 @@ def get_dataset_811(config):
             data_dict['valid'][omic + '_mask'] = np.array(data_dict['valid'][omic + '_mask'].values).astype('float64')
             data_dict['test'][omic + '_mask'] = np.array(data_dict['test'][omic + '_mask'].values).astype('float64')
 
-        # Dataset Feature Scaling
+        # Dataset Feature Scaling - RACHEL: does nothing if set to NONE
         data_dict = _feature_scaling(config, data_dict)
 
         with open(PICKLE_PATH, "wb") as handle:
@@ -197,6 +213,7 @@ class Torch_Dataset:
         return train_dataset, valid_dataset
 
 def torchify_vaeserin(config):
+    #RACHEL: get the type of genetic data (mRNA data was used in paper and will be used in this project)
     omic_type = config.omic_list[0]
     device = torch.device(config.device_type)
     dataset = get_dataset_811(config)

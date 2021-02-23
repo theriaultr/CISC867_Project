@@ -94,6 +94,7 @@ def run_session(config):
     #RACHEL: Running a session with the VAE
     if config.model_type == 'vae':
         #RACHEL: Retreive and split the data - function torchify_vaeserin in vae_utils
+        #this returns dataframe for train< valid and test and the number of genes
         train, valid, test, num_cols = torchify_vaeserin(config)
         #RACHEL: Create VAE class --> in vae_models.py
         maven = VAE(config=config, logger=LOGGER, num_features=num_cols)

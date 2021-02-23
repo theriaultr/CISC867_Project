@@ -14,11 +14,11 @@ np.set_printoptions(threshold=sys.maxsize)
 
 cancer_list_dict = {
     'ching': ['BLCA', 'BRCA', 'HNSC', 'KIRC', 'LGG', 'LIHC', 'LUAD', 'LUSC', 'OV', 'STAD'],
-    'wang': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'ESCA', 'HNSC', 'KIRC', 'KIRP', 
+    'wang': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'ESCA', 'HNSC', 'KIRC', 'KIRP',
              'LGG', 'LIHC', 'LUAD', 'LUSC', 'MESO', 'PAAD', 'SARC', 'SKCM', 'STAD', 'UCEC', 'UCS'],
-    'all': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM', 
-            'HNSC', 'KICH', 'KIPAN', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD', 'LUSC', 
-            'MESO', 'OV', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'STES', 
+    'all': ['ACC', 'BLCA', 'BRCA', 'CESC', 'UVM', 'CHOL', 'COAD', 'DLBC', 'ESCA', 'GBM',
+            'HNSC', 'KICH', 'KIPAN', 'KIRC', 'KIRP', 'LAML', 'LGG', 'LIHC', 'LUAD', 'LUSC',
+            'MESO', 'OV', 'PAAD', 'PCPG', 'PRAD', 'READ', 'SARC', 'SKCM', 'STAD', 'STES',
             'TGCT', 'THCA', 'THYM', 'UCEC', 'UCS']
 }
 
@@ -53,11 +53,14 @@ def get_dataset_811(config):
         df.fillna(0.0, axis=1, inplace=True)
 
         # Dataset Split Train, Valid and Test
+        print("RUNNING Fold@811 PORTION*****************")
         df_train = df.loc[df['Fold@811'] == 0]
         df_valid = df.loc[df['Fold@811'] == 1]
         df_test = df.loc[df['Fold@811'] == 2]
 
         for omic in config.omic_list:
+            # print("ENTERING OMIC LIST*******************")
+            # print(omic)
             data_dict['train'][omic] = df_train[[x for x in df_train.columns.get_values() if omic in x]]
             data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns.get_values() if omic in x]]
             data_dict['test'][omic] = df_test[[x for x in df_test.columns.get_values() if omic in x]]
@@ -97,7 +100,7 @@ def get_dataset_811(config):
 
     with open(PICKLE_PATH, "rb") as handle:
         data_dict = pickle.load(handle)
-    
+
     for o in config.omic_list:
         print('Train', o, data_dict['train'][o].shape)
         print('Valid', o, data_dict['valid'][o].shape)
@@ -121,14 +124,14 @@ def get_statistics(cancer_type='ACC' ):
     ORIGINAL_FILE = "./data/merged_splits/" + cancer_type + "_5fold.tsv"
     df = pd.read_csv(ORIGINAL_FILE, sep="\t", header=0, index_col=0)
     print(cancer_type, "Num of Censored Data:", df['Cli@Censored'].sum(), "Num of Uncensored Data:", df.shape[0] - df['Cli@Censored'].sum(), "Total:", df.shape[0])
-    
+
     # print(cancer_type, "Number of Censored Data: ", df.loc[df['Cli@Censored'] == 1.0].sum())
-    # print(cancer_type, "Number of Uncensored Data: ", df.loc[df['Cli@Censored'] == 0.0].sum()) 
+    # print(cancer_type, "Number of Uncensored Data: ", df.loc[df['Cli@Censored'] == 0.0].sum())
 
 def get_dataset(config, fold=0):
     pool = mp.Pool(processes=10)
     pickle_dict = dict()
-    WHAT_OMICS = "_".join(config.omic_list) 
+    WHAT_OMICS = "_".join(config.omic_list)
     PICKLE_PATH = "./data/merged_splits/{0}_5fold_{1}_{2}_{3}_{4}_{5}_{6}.pickle".format(config.cancer_list, config.missing_impute, config.gcn_mode, config.feature_scaling, config.augment_autoencoder, config.deseq2, WHAT_OMICS)
 
     if not os.path.isfile(PICKLE_PATH):
@@ -136,7 +139,7 @@ def get_dataset(config, fold=0):
         for cancer_type in cancer_list_dict[config.cancer_list]:
             results.append(pool.apply_async(_get_subdataset, args=(config, cancer_type, 0)))
         outputs = [p.get() for p in results]
-        
+
         for output in outputs:
             c, d = output
             pickle_dict[c] = _combine_train_test(d)
@@ -162,7 +165,7 @@ def get_dataset(config, fold=0):
 def get_dataset_fold(config, fold=0):
     pool = mp.Pool(processes=10)
     pickle_dict = dict()
-    WHAT_OMICS = "_".join(config.omic_list) 
+    WHAT_OMICS = "_".join(config.omic_list)
     PICKLE_PATH = "./data/merged_splits/{0}_5fold_{1}_{2}_{3}_{4}_{5}_{6}_{7}.pickle".format(config.cancer_list, config.missing_impute, config.gcn_mode, config.feature_scaling, config.augment_autoencoder, config.sub_graph, fold, WHAT_OMICS)
 
     if not os.path.isfile(PICKLE_PATH):
@@ -170,7 +173,7 @@ def get_dataset_fold(config, fold=0):
         for cancer_type in cancer_list_dict[config.cancer_list]:
             results.append(pool.apply_async(_get_subdataset, args=(config, cancer_type, fold)))
         outputs = [p.get() for p in results]
-        
+
         for output in outputs:
             c, d = output
             pickle_dict[c] = d
@@ -199,7 +202,7 @@ def _combine_train_test(data_dict):
         if 'Cli@' in key:
             new_dict[key] = np.hstack((data_dict['train'][key], data_dict['test'][key]))
         else:
-            new_dict[key] = np.vstack((data_dict['train'][key], data_dict['test'][key])) 
+            new_dict[key] = np.vstack((data_dict['train'][key], data_dict['test'][key]))
 
     return new_dict
 
@@ -208,11 +211,11 @@ def _get_subdataset(config, cancer_type, fold):
 
     if config.deseq2:
         ORIGINAL_FILE = "./data/merged_splits/" + cancer_type + "_DESeq2.tsv"
-    else: 
+    else:
         ORIGINAL_FILE = "./data/merged_splits/" + cancer_type + "_5fold.tsv"
     data_dict = {'train': dict(), 'test': dict(), 'adj': dict(), 'deg': dict()}
     df = pd.read_csv(ORIGINAL_FILE, sep="\t", header=0, index_col=0)
-    
+
     # Drop Zero Survivals
     df = _drop_zero_survival(config, df)
 
@@ -286,7 +289,7 @@ def _missing_imputation(config, df):
                     continue
     try:
         df = df.dropna(subset=['Cli@Days2Death', 'Cli@Days2FollowUp'], how='all')
-    except: 
+    except:
         pass
     df.fillna(0.0, axis=1, inplace=True)
 
@@ -299,7 +302,7 @@ def _train_test_split(config, df, fold):
     for omic in config.omic_list:
         data_dict['train'][omic] = df_train[[x for x in df_train.columns.get_values() if omic in x]]
         data_dict['test'][omic] = df_test[[x for x in df_test.columns.get_values() if omic in x]]
-    
+
     return df_train, df_test, data_dict
 
 def _clinical_handling(df_train, df_test, data_dict):
@@ -347,7 +350,7 @@ def _get_num_censored(surv_list, cens_list, surv_time):
 def _get_ipc_weights(data_dict):
     for key in ['train', 'test']:
         ipcw_list, temp_list = [], []
-        surv_list = list(data_dict[key]['Cli@Survival']) 
+        surv_list = list(data_dict[key]['Cli@Survival'])
         mask_list = list(data_dict[key]['Cli@Masking'])
         cens_list = list(data_dict[key]['Cli@Censored'])
         for idx, item in enumerate(surv_list):
@@ -402,7 +405,7 @@ def _feature_scaling(config, data_dict):
     if 'None' not in config.feature_scaling:
         for key in data_dict['train'].keys():
             if 'Cli@' not in key and '_mask' not in key:
-                scaler = StandardScaler() 
+                scaler = StandardScaler()
                 if config.feature_scaling == 'z':
                     scaler = StandardScaler()
                 elif config.feature_scaling == 'minmax':
@@ -431,7 +434,7 @@ def _make_coo_matrix(adj_matrix):
             if row <= i:
                 coo_matrix.append([row, i])
     return np.array(coo_matrix).T
-        
+
 def _make_deg_matrix(adj_matrix):
     adj_matrix = np.array(adj_matrix)
     deg_matrix = []
@@ -566,8 +569,3 @@ if __name__ == '__main__':
     #
     # temp = get_dataset(gcn_mode=True, fea_sel=fea_sel)
     # x = 0
-
-
-
-
-
