@@ -18,6 +18,9 @@ from vae_utils import *
 import logging
 from multiprocessing import Pool
 
+#RACHEL
+import matplotlib.pyplot as plt
+
 #RACHEL: Define the dictionary of cancer TCGA data (currently dummy data). Defines the dataset names according to TCGA codes
 cancer_list_dict = {
 	'ching': ['BLCA', 'BRCA', 'HNSC', 'KIRC', 'LGG', 'LIHC', 'LUAD', 'LUSC', 'OV', 'STAD'],
@@ -81,14 +84,14 @@ class AE(nn.Module):
 			nn.Linear(self.num_features, config.hidden_nodes),
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate),
-			nn.Linear(config.hidden_nodes, 128), #***RACHEL: THIS IS A PARAMETER MAY WANT TO CHANGE (need to change in decoding layer too)
+			nn.Linear(config.hidden_nodes, 1024), #RACHEL changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
 
 		#RACHEL: Create a decoding layer - symmetric to encoding layer
 		self.decode = nn.Sequential(
-			nn.Linear(128, config.hidden_nodes),
+			nn.Linear(1024, config.hidden_nodes),  #RACHEL changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate),
 			nn.Linear(config.hidden_nodes, self.num_features)
@@ -166,13 +169,15 @@ class AE(nn.Module):
 	#RACHEL: fit the training data (using validation set as well) for the AE
 	def fit(self, trainset, validset=None):
 		#RACHEL:initialize the layers
+		train_RMSE = []
+		valid_RMSE = []
 		self.init_layers()
 		#RACHEL:use the appropriate device type
 		model = self.to(self.device_type)
 		#RACHEL:print the model information
 		print(model)
 		#RACHEL:get the optimizer and set parameters based on those defined at the beginning of the class
-		optimizer = get_optimizer(self.opti_name)(model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+		optimizer = get_optimizer(self.opti_name)(model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay, momentum=0.5)
 		#RACHEL:print the optimizer information
 		print(optimizer)
 		#RACHEL:determine the number of batches needed for the training and validation data based on provided batch_size
@@ -260,6 +265,29 @@ class AE(nn.Module):
 						self.write_best_loss()
 						self.best_valid_flag = True
 			t.set_description('(Training: %g)' % float(math.sqrt(self.global_train_loss)) + '(Validation: %g)' % float(math.sqrt(self.global_valid_loss)))
+			#RACHEL: keep track of trainng and validation so can produce a plot at the end
+			train_RMSE.append(float(math.sqrt(self.global_train_loss)))
+			valid_RMSE.append(float(math.sqrt(self.global_valid_loss)))
+
+		#RACHEL: after all epochs completed create a predict_log_partial_hazard
+		plt.figure
+		plt.plot([x for x in range(1,len(train_RMSE)+1)], train_RMSE)
+		plt.plot([x for x in range(1,len(train_RMSE)+1)], valid_RMSE)
+		plt.title("")
+		plt.xlabel("Epoch")
+		plt.ylabel("RMSE")
+		plt.legend(['Train', 'Validation'])
+		plt.show()
+
+		# plt.figure
+		# plt.plot([x for x in range(1,len(valid_RMSE)+1)], valid_RMSE)
+		# plt.title("Validation RMSE")
+		# plt.xlabel("Epoch")
+		# plt.ylabel("RMSE")
+		# plt.show()
+
+
+
 		return model
 
 	#RACHEL:test the model (check encoding + decoding)
@@ -320,19 +348,19 @@ class VAE(AE):
 		)
 		#RACHEL: create encoding mu layer (1 linear with dropout)
 		self.encode_mu = nn.Sequential(
-			nn.Linear(config.hidden_nodes, 128), #RACHEL:**may want to change dim here
+			nn.Linear(config.hidden_nodes, 1024), #RACHEL:Changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
 		#RACHEL:create encoding si layer (1 linear with dropout)
 		self.encode_si = nn.Sequential(
-			nn.Linear(config.hidden_nodes, 128), #RACHEL:may want to change dim here
+			nn.Linear(config.hidden_nodes, 1024),#RACHEL:Changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
 		#create the deconding layer (2 linear layers with dropout in between - symmetric to encoding layer)
 		self.decode = nn.Sequential(
-			nn.Linear(128, config.hidden_nodes),
+			nn.Linear(1024, config.hidden_nodes), #RACHEL:Changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate),
 			nn.Linear(config.hidden_nodes, num_features)
@@ -383,12 +411,12 @@ class DAE(AE):
 			nn.Linear(self.num_features, config.hidden_nodes),
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate),
-			nn.Linear(config.hidden_nodes, 128),
+			nn.Linear(config.hidden_nodes, 1024),#RACHEL changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate)
 		)
 		self.decode = nn.Sequential(
-			nn.Linear(128, config.hidden_nodes),
+			nn.Linear(1024, config.hidden_nodes),#RACHEL: changed from 128 to 1024
 			acti_func_dict[config.acti_func],
 			nn.Dropout(self.dropout_rate),
 			nn.Linear(config.hidden_nodes, self.num_features)

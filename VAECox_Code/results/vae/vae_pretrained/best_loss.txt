@@ -1,0 +1,1 @@
+hn_4096_af_Tanh_ms_basic_mt_vae_vd_LIHC_VAE	0.5082774758338928

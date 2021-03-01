@@ -1,0 +1,6 @@
+02/28/2021 08:01:39 PM: [ COMMAND: vae_main.py -mt vae -ol mrna@ -hn 4096 -lr 0.1 -dr 0.1 -wd 1e-5 -dv cuda -cd 0 -sn vae_pretrained -fc None -mx 5000 -af Tanh -mo SGD -bs 0 -vd LIHC_VAE -sm ]
+03/01/2021 03:32:07 PM: [ Best Loss Updated: False ]
+03/01/2021 03:32:07 PM: [ Saving Model.... ]
+03/01/2021 03:32:11 PM: [ ==============Final Results============== ]
+03/01/2021 03:32:11 PM: [ Metric	Training	Validation	Testing ]
+03/01/2021 03:32:11 PM: [ RMSE Loss	0.7760	0.8218	0.8369 ]

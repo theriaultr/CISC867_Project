@@ -49,9 +49,14 @@ def get_dataset_811(config):
     }
     WHAT_OMICS = "_".join(config.omic_list) #RACHEL: omic_list is option in config
     #RACHEL:original file contains left column of id, top row gene name< following rows normalized gene data
-    ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
+    # ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
+
+    ORIGINAL_FILE = "./data/{0}_811_{1}.csv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
     #RACHEL: this file contains left column patient id, top row genes< following rows whether or not gene is included
+    # MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
+
     MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
+
     #RACHEL: develop the pickle file oath name based on run_time system information
     PICKLE_PATH = "./data/{0}_811_{1}_{2}_{3}_{4}_{5}.pickle".format(config.vae_data, config.gcn_mode, config.feature_scaling, config.feature_selection, config.sub_graph, WHAT_OMICS)
         ##RACHEL:**may just eb able to change to match pickle name
@@ -60,7 +65,7 @@ def get_dataset_811(config):
         print("Making new pickle file...")
         # Missing Value Handling
         #RACHEL: read the original file*****
-        df = pd.read_csv(ORIGINAL_FILE, sep="\t", header=0, index_col=0)
+        df = pd.read_csv(ORIGINAL_FILE, sep=",", header=0, index_col=0) #RACHEL: edited to work with csv (Used to be "\t")
         #RACHEL: read the masking file********
         mf = pd.read_csv(MASKING_FILE, sep=",", header=0, index_col=0)
         #RACHEL: re-index labels so match order
@@ -68,6 +73,8 @@ def get_dataset_811(config):
         print("printing index**********************************:")
         #RACHEL:this prints the patient ID information (row names) **comment out when run
         print(df.index)
+        print("printing columns***************************")
+        print(df.columns)
         print(mf.index)
         # mf = mf.replace(0,np.nan)
         # mf = mf.dropna(how='all',axis=0)
@@ -77,18 +84,18 @@ def get_dataset_811(config):
         df.fillna(0.0, axis=1, inplace=True)
 
         # Dataset Split Train, Valid and Test
-        temp =df['Fold@811']
-        print("printing Fold@811")
-        print(temp)
+        temp =df['Fold@811']#RACHEL" Before 'Fold@811'
+        # print("printing Fold@811")
+        # print(temp)
         df_train = df.loc[df['Fold@811'] == 0]
-        print("training index:")
-        print(df_train.index)
+        # print("training index:")
+        # print(df_train.index)
         df_valid = df.loc[df['Fold@811'] == 1]
-        print("valid index:")
-        print(df_valid.index)
+        # print("valid index:")
+        # print(df_valid.index)
         df_test = df.loc[df['Fold@811'] == 2]
-        print("test index:")
-        print(df_test.index)
+        # print("test index:")
+        # print(df_test.index)
 
         # print(df_train.columns)
         #RACHEL: get the data and labels???

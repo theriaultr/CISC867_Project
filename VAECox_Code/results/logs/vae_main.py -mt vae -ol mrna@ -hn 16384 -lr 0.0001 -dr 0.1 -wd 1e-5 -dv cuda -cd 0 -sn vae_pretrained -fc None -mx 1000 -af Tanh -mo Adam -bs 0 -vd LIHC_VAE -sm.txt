@@ -1,0 +1,1 @@
+02/28/2021 02:05:46 PM: [ COMMAND: vae_main.py -mt vae -ol mrna@ -hn 16384 -lr 0.0001 -dr 0.1 -wd 1e-5 -dv cuda -cd 0 -sn vae_pretrained -fc None -mx 1000 -af Tanh -mo Adam -bs 0 -vd LIHC_VAE -sm ]
