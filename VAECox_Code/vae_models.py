@@ -153,6 +153,7 @@ class AE(nn.Module):
 		x = x * m if self.exclude_imp else x
 		recon = recon * m if self.exclude_imp else recon
 
+		#get the loss value
 		if not self.exclude_imp:
 			return get_mse_loss(recon, x)
 		else:

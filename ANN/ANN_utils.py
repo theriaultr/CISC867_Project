@@ -14,14 +14,13 @@ def develop_dataset(config):
     }
     WHAT_OMICS = "_".join(config.omic_list) #RACHEL: omic_list is option in config
 
+    #****CHANGE THIS SO ONLY USING ORIGINAL FILE AND LABEL IS GIVEN AS A COLUMN
+
     #original file contains left column of id, top row gene name< following rows normalized gene data
     ORIGINAL_FILE = "./data/{0}_811_{1}.csv".format(config.model_type,WHAT_OMICS)
-    #
-    # #this file contains left column patient id, top row genes< following rows whether or not gene is included
-    # MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
 
     #develop the pickle file path name (Ex. lasso_811_mrna_formatted.pickle)
-    PICKLE_PATH = "./data/{0}_811_{1}_formatted.pickle".format(config.model_type, WHAT_OMICS)
+    PICKLE_PATH = "./data/{0}_811_{1}_labels.pickle".format(config.model_type, WHAT_OMICS)
         ##RACHEL:**may just eb able to change to match pickle name
     #RACHEL: if the pickle file has not been made yet, make one
     if not os.path.isfile(PICKLE_PATH):
@@ -29,16 +28,11 @@ def develop_dataset(config):
         # Missing Value Handling
         #read the original file (CSV)****
         df = pd.read_csv(ORIGINAL_FILE, sep=",", header=0, index_col=0)
-        # read the masking file --> true class label????********
-        mf = pd.read_csv(MASKING_FILE, sep=",", header=0, index_col=0)
-        # RACHEL: re-index labels so match order
-        mf = mf.reindex(df.index)
-        # print("printing index**********************************:")
+
         #RACHEL:this prints the patient ID information (row names) **comment out when run
         print(df.index)
         print("printing columns***************************")
         print(df.columns)
-        print(mf.index)
         # mf = mf.replace(0,np.nan)
         # mf = mf.dropna(how='all',axis=0)
         # mf = mf.dropna(how='all',axis=1)
@@ -48,7 +42,7 @@ def develop_dataset(config):
 
         # Dataset Split Train, Valid and Test
         temp =df['Fold@811']
-        df_train = df.loc[df['Fold@811'] == 0]
+        df_train = df.loc[df['Fold@811'] == 0] #pull out rows where
         df_valid = df.loc[df['Fold@811'] == 1]
         df_test = df.loc[df['Fold@811'] == 2]
 
@@ -60,18 +54,18 @@ def develop_dataset(config):
             data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns if omic in x]]
             data_dict['test'][omic] = df_test[[x for x in df_test.columns if omic in x]]
             #RACHEL:pull out mask (whether or not to include gene)
-            data_dict['train'][omic + '_mask'] = mf.loc[df_train.index]
-            data_dict['valid'][omic + '_mask'] = mf.loc[df_valid.index]
-            data_dict['test'][omic + '_mask'] = mf.loc[df_test.index]
+            data_dict['train'][omic + '_label'] = df_train['Stage_Label']
+            data_dict['valid'][omic + '_label'] = df_valid['Stage_Label']
+            data_dict['test'][omic + '_label'] = df_test['Stage_Label']
 
         # Dataset 'Numpification'
         for omic in config.omic_list:
             data_dict['train'][omic] = np.array(data_dict['train'][omic].values).astype('float64')
             data_dict['valid'][omic] = np.array(data_dict['valid'][omic].values).astype('float64')
             data_dict['test'][omic] = np.array(data_dict['test'][omic].values).astype('float64')
-            data_dict['train'][omic + '_mask'] = np.array(data_dict['train'][omic + '_mask'].values).astype('float64')
-            data_dict['valid'][omic + '_mask'] = np.array(data_dict['valid'][omic + '_mask'].values).astype('float64')
-            data_dict['test'][omic + '_mask'] = np.array(data_dict['test'][omic + '_mask'].values).astype('float64')
+            data_dict['train'][omic + '_label'] = np.array(data_dict['train'][omic + '_label'].values).astype('float64')
+            data_dict['valid'][omic + '_label'] = np.array(data_dict['valid'][omic + '_label'].values).astype('float64')
+            data_dict['test'][omic + '_label'] = np.array(data_dict['test'][omic + '_mask'].values).astype('float64')
 
         with open(PICKLE_PATH, "wb") as handle:
             #RACHEL: write to file level
@@ -92,7 +86,7 @@ def develop_dataset(config):
 
 class Torch_Dataset:
     def __init__(self, X, y):
-        self.X, self.y = X, y
+        self.X, self.y = X, int(y)
         self.num_samples = self.X.size()[0]
 
     #UNCOMMENT AND USE IF DECIDE TO TRY K-FOLD VALIDATION
@@ -126,15 +120,15 @@ def get_data(config):
 
     #define x/y for train, validation and test data
     x_train = torch.tensor(dataset['train'][omic_type], dtype=torch.float32)
-    y_train = torch.tensor(dataset['train'][omic_type + '_mask'], dtype=torch.float32)
+    y_train = torch.tensor(dataset['train'][omic_type + '_label'], dtype=torch.float32)
     x_valid = torch.tensor(dataset['valid'][omic_type], dtype=torch.float32).to(device)
-    y_valid = torch.tensor(dataset['valid'][omic_type + '_mask'], dtype=torch.float32)
+    y_valid = torch.tensor(dataset['valid'][omic_type + '_label'], dtype=torch.float32)
     x_test = torch.tensor(dataset['test'][omic_type], dtype=torch.float32).to(device)
-    y_test = torch.tensor(dataset['test'][omic_type + '_mask'], dtype=torch.float32)
+    y_test = torch.tensor(dataset['test'][omic_type + '_label'], dtype=torch.float32)
 
     #combine the x and y data into a class Torch_Dataset for processing with the torch model
-    train_dataset = Torch_Dataset(x_train, y_train)
-    valid_dataset = Torch_Dataset(x_valid, y_valid)
-    test_dataset = Torch_Dataset(x_test, y_test)
+    train_dataset = Torch_Dataset(x_train, y_train) #the y data is class 0-4
+    valid_dataset = Torch_Dataset(x_valid, y_valid) #the y data is class 0-4
+    test_dataset = Torch_Dataset(x_test, y_test) #the y data is class 0-4
 
     return train_dataset, valid_dataset, test_dataset, num_cols

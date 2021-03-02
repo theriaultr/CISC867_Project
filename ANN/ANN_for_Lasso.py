@@ -18,6 +18,9 @@ class ANN_Lasso(nn.module):
         self.batch_size = config.batch_size
         self.momentum = config.momentum
         self.max_epochs = config.max_epochs
+        self.conf_mat_train = torch.zeros(self.nodes_output, self.nodes_output)
+        self.conf_mat_valid = torch.zeros(self.nodes_output, self.nodes_output)
+        self.conf_mat_test = torch.zeros(self.nodes_output, self.nodes_output)
 
         #define parameters to keep track of during training
         self.global_train_loss = 0.0
@@ -26,20 +29,20 @@ class ANN_Lasso(nn.module):
         self.num_since_best_valid_loss = 0.0
         self.patience = config.patience
 
-        super(ANN_Genes self).__init__()
+        super(ANN_Genes, self).__init__()
 
         #define the layers of the model (when onl considering genetoc data)
         self.network = nn.Sequential(
-            nn.Linear(self.nodes_hidden_1),
+            nn.Linear(num_features, self.nodes_hidden_1),
             nn.Tanh,
             nn.Dropout(self.dropout_rate)
-            nn.Linear(self.nodes_hidden_2),
+            nn.Linear(self.nodes_hidden_1, self.nodes_hidden_2),
             nn.Tanh,
             nn.Dropout(self.dropout_rate)
-            nn.Linear(self.nodes_hidden_3),
+            nn.Linear(self.nodes_hidden_2, self.nodes_hidden_3),
             nn.Tanh,
             nn.Dropout(self.dropout_rate),
-            nn.Linear(self.nodes_output)
+            nn.Linear(self.nodes_hidden_3, self.nodes_output) #returns 5 outputs
         )
 
     def init_layers(self):
@@ -53,13 +56,29 @@ class ANN_Lasso(nn.module):
 
     #Fit method is same as VAE except added in patiene for training and edited some portions
     def fit(self, trainset, validset=None):
+        '''
+        Returns:
+            self - model
+            conf_mat_train - confusion matrix for the training data
+            conf_mat_valid
+        '''
         #MAY NEED TO EDIT WHAT TRAINSET IS AND THE FORMAT IT IS IN...
 
         train_RMSE = []
 		valid_RMSE = []
+
+        # #make a confusion matrix of targets as columns and predictions as rows (the calculate sensitvity at end)
+        # conf_mat_train = torch.zeros(self.nodes_output, self.nodes_output)
+        # conf_mat_valid = torch.zeros(self.nodes_output, self.nodes_output)
+
+
 		self.init_layers()
         print(self)
-        optimizer = get_optimizer()(self.parameters(), lr=self.learning_rate, momentum = self.momentum)
+
+        #define the optimizer and loss criteria (cross entropy)
+        optimizer = optim.SGD(self.parameters(), lr=self.learning_rate, momentum = self.momentum)
+        criterion = nn.CrossEntropyLoss()
+
         batch_num = int(trainset.num_samples / self.batch_size) if self.batch_size != 0 else 1
 		batch_val = int(validset.num_samples / self.batch_size) if self.batch_size != 0 else 1
 
@@ -75,7 +94,11 @@ class ANN_Lasso(nn.module):
             if no_improvement == self.patience:
                 break
 
-			self.batch_flag = False
+            #reset the training and validation confusion matrix (so nonly stores for latest epoch)
+            conf_mat_train*=0
+            conf_mat_valid*=0
+
+			# self.batch_flag = False
 			#put the model in training mode
 			self.train()
 
@@ -89,8 +112,16 @@ class ANN_Lasso(nn.module):
 					i, j = (self.batch_size * b) % trainset.num_samples, (self.batch_size * (b+1)) % trainset.num_samples
 					#make sure the model is in training mode
 					self.train()
-					#for the training data, calculate the loss
-					loss = self(trainset.X[i:j,:])
+					#get the output of all samples (5 column tensor)
+					result = self(trainset.X[i:j,:])
+                    loss = criterion(result, trainset.y[i:j]) #expects y to be integer, result is everythibg
+
+                    #loop through the predicted and actual values and add to the confusion matrix accordingly
+                    for idx, x in enumerate(result):
+                        predicted = torch.softmax(x, dim=1)
+                        actual = trainset.y[i+idx]
+                        conf_mat_train[predicted, actual] += 1
+
                     #calculate the total
 					self.global_train_loss += loss.item() * self.batch_size
                     #set the gradients to 0 so can backpropogate
@@ -124,7 +155,15 @@ class ANN_Lasso(nn.module):
                     #make sure the model is in evaluation mode
 					model.eval()
                     #perform a forward pass using the validation data
-					vloss = self(validset.X)
+					result = self(validset.X)
+                    vloss = criterion(result, validset.y) #expects y to be integer, result is everythibg
+
+                    #loop through the predicted and actual values and add to the confusion matrix accordingly
+                    for idx, x in enumerate(result):
+                        predicted = torch.softmax(x, dim=1)
+                        actual = validset.y[idx]
+                        conf_mat_valid[predicted, actual] += 1
+
                     #make sure there are not NaNs in the results
 					assert torch.isnan(vloss).sum().sum() != 1
                     #add to the global validation loss
@@ -138,20 +177,24 @@ class ANN_Lasso(nn.module):
 
 					#save the model if the (same way as VAE)***********
 					SAVE_PATH = '{}best_model'.format(self.save_path)
-					if self.save_mode and (self.global_valid_loss < self.best_valid_loss):
-						self.best_valid_loss = float(self.global_valid_loss)
-						torch.save({'epoch': epoch,
-									'model_state_dict': model.state_dict(),
-									'optimizer_state_dict': optimizer.state_dict()}, SAVE_PATH)
-						self.write_best_loss()
-						self.best_valid_flag = True
+					if self.global_valid_loss < self.best_valid_loss:
+                        no_improvement = 0
+                        self.best_valid_loss = float(self.global_valid_loss)
+                        print("IMPROVED!")
+                        print(self.best_valid_loss)
+						# torch.save({'epoch': epoch,
+						# 			'model_state_dict': model.state_dict(),
+						# 			'optimizer_state_dict': optimizer.state_dict()}, SAVE_PATH)
+						# self.write_best_loss()
+						# self.best_valid_flag = True
                     else:
                         no_improvement +=1
 
 
             #Add training and validation loss to keep track (will plot at end)
-			train_RMSE.append(float(math.sqrt(self.global_train_loss)))
-			valid_RMSE.append(float(math.sqrt(self.global_valid_loss)))
+			train_RMSE.append(self.global_train_loss)
+			valid_RMSE.append(self.global_valid_loss)
+
 
         #end epochs (either because reched max epochs or reached patience)
         #plot the training and validation error on the same figure
@@ -163,8 +206,10 @@ class ANN_Lasso(nn.module):
     	plt.ylabel("RMSE")
     	plt.legend(['Train', 'Validation'])
     	plt.show()
+        self.conf_mat_train = conf_mat_train
+        self.conf_mat_valid = conf_mat_valid
 
-        return self
+        return self, conf_mat_train, conf_mat_valid
         #Todo: restore the model to its best weights (access saved weights)
     #end fit functions
 
@@ -173,15 +218,24 @@ class ANN_Lasso(nn.module):
         #set the initial loss
 		loss = 0.0
 		#determine how many batches needed
-		model = self
+        criterion = nn.CrossEntropyLoss()
+        conf_mat = torch.zeros(self.nodes_output, self.nodes_output)
+
 		with torch.no_grad():
 			#put the model into evaluation mode (turn off dropout etc.)
-			model.eval()
+			self.eval()
 			#calculate the loss of the model
-			vloss = self(dataset.X)
+            result = self(dataset.X)
+            vloss = criterion(result, dataset.y)
 			loss = vloss.item()
+            for idx, x in enumerate(result):
+                predicted = torch.softmax(x, dim=1)
+                actual = dataset.y[idx]
+                conf_mat[predicted, actual] += 1
+
+        self.conf_mat_test = conf_mat
 		#RACHEL:return average loss
-		return loss
+		return loss, conf_mat
 
 def fit_predict(self, trainset, validset, testset):
     '''

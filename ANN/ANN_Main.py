@@ -15,17 +15,15 @@ parser.add_argument('--nodes_hidden_3', 'nh3', type=int, default=32)
 parser.add_argument('--learning_rate', 'lr', type=float, default=0.001)
 parser.add_argument('--max_epochs', '-mx', type=int, default=500)
 parser.add_argument('--dropout_rate', '-dr', type=float, default=0.0)
-parser.add_argument('--batch_size', '-bs', type=int, default=64)
+parser.add_argument('--batch_size', '-bsi', type=int, default=64)
 parser.add_argument('--momentum', '-bs', type=float, default = 0.9)
 parser.add_argument('--patience', '-p', type=int, default = 5)
 parser.add_argument('--num_folds', 'nf', type=int, default = 10)
 
+#ADD SAVE_PATH
 config = parser.parse_args()
 
 #NOTE: file name: ORIGINAL_FILE = "./data/{0}_811_{1}.csv".format(config.model_type,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
-
-def get_data(config):
-    return 1
 #train and test the model using 10/fold cross validation
 def run_session(config):
     #split the data into 10 folds
