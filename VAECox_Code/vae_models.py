@@ -188,7 +188,7 @@ class AE(nn.Module):
 		t = trange(self.max_epochs + 1, desc='Training...')
 		for epoch in t:
 			self.batch_flag = False
-			#RACHEL:train the given model???
+			#RACHEL:put the model in training mode
 			model.train()
 			#RACHEL:if using batches
 			if self.batch_size != 0:
@@ -198,7 +198,7 @@ class AE(nn.Module):
 				for b in range(batch_num):
 					#RACHEL:calculate indices for the batch
 					i, j = (self.batch_size * b) % trainset.num_samples, (self.batch_size * (b+1)) % trainset.num_samples
-					#RACHEL:train the model for the batch and calculate the loss
+					#RACHEL:make sure the model is in training mode
 					model.train()
 					#RACHEL:Define a model with only btach data
 					loss = model(trainset.X[i:j,:], trainset.m[i:j,:], trainset.coo)
@@ -269,7 +269,7 @@ class AE(nn.Module):
 			train_RMSE.append(float(math.sqrt(self.global_train_loss)))
 			valid_RMSE.append(float(math.sqrt(self.global_valid_loss)))
 
-		#RACHEL: after all epochs completed create a predict_log_partial_hazard
+		#RACHEL: added after all epochs completed create a predict_log_partial_hazard
 		plt.figure
 		plt.plot([x for x in range(1,len(train_RMSE)+1)], train_RMSE)
 		plt.plot([x for x in range(1,len(train_RMSE)+1)], valid_RMSE)
