@@ -4,6 +4,8 @@ from torch import nn, optim
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from tqdm import trange
+import numpy as np
+import math
 
 class ANN_Lasso(nn.Module):
 #This class is run to process input data that only includes features seleced from ANN_Lasso
@@ -118,11 +120,20 @@ class ANN_Lasso(nn.Module):
                     self.train()
 					#get the output of all samples (5 column tensor)
                     result = self(trainset.X[i:j,:])
-                    loss = criterion(result, trainset.y[i:j]) #expects y to be integer, result is everythibg
-
+                    # print("******printing result type*************")
+                    # print(type(result))
+                    # print(type(trainset.y))
+                    loss = criterion(result, torch.tensor(np.array(trainset.y[i:j]))) #expects y to be integer, result is everythibg
+                    # print('*****result shape in fit function*********')
+                    # print(result.size())
                     #loop through the predicted and actual values and add to the confusion matrix accordingly
                     for idx, x in enumerate(result):
-                        predicted = torch.softmax(x, dim=1)
+                        # print('***** shape of x *********')
+                        # print(x)
+                        predicted = torch.argmax(x)
+                        # print("*******size of predicted*****")
+                        # print(predicted)
+                        # print(predicted)
                         actual = trainset.y[i+idx]
                         conf_mat_train[predicted, actual] += 1
 
@@ -157,14 +168,14 @@ class ANN_Lasso(nn.Module):
                 #make sure not to use gradient during validation
                 with torch.no_grad():
                     #make sure the model is in evaluation mode
-                    model.eval()
+                    self.eval()
                     #perform a forward pass using the validation dat
                     result = self(validset.X)
-                    vloss = criterion(result, validset.y) #expects y to be integer, result is everythibg
+                    vloss = criterion(result,  torch.tensor(np.array(validset.y))) #expects y to be integer, result is everythibg
 
                     #loop through the predicted and actual values and add to the confusion matrix accordingly
                     for idx, x in enumerate(result):
-                        predicted = torch.softmax(x, dim=1)
+                        predicted = torch.argmax(x)
                         actual = validset.y[idx]
                         conf_mat_valid[predicted, actual] += 1
 
@@ -180,7 +191,7 @@ class ANN_Lasso(nn.Module):
                         self.global_train_loss /= lb
 
     				#save the model if the (same way as VAE)***********
-                    SAVE_PATH = '{}best_model'.format(self.save_path)
+                    # SAVE_PATH = '{}best_model'.format(self.save_path)
                     if self.global_valid_loss < self.best_valid_loss:
                         no_improvement = 0
                         self.best_valid_loss = float(self.global_valid_loss)
@@ -229,10 +240,10 @@ class ANN_Lasso(nn.Module):
             self.eval()
 			#calculate the loss of the model
             result = self(dataset.X)
-            vloss = criterion(result, dataset.y)
+            vloss = criterion(result,  torch.tensor(np.array(dataset.y)))
             loss = vloss.item()
             for idx, x in enumerate(result):
-                predicted = torch.softmax(x, dim=1)
+                predicted = torch.argmax(x)
                 actual = dataset.y[idx]
                 conf_mat[predicted, actual] += 1
 

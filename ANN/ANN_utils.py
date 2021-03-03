@@ -94,7 +94,7 @@ def develop_dataset(config):
 
 class Torch_Dataset:
     def __init__(self, X, y):
-        self.X, self.y = X, [int(z) for z in y]
+        self.X, self.y = X, [z.long() for z in y]
         self.num_samples = self.X.size()[0]
 
     #UNCOMMENT AND USE IF DECIDE TO TRY K-FOLD VALIDATION
