@@ -3,6 +3,11 @@ import torch.utils.data
 from torch import nn, optim
 from torch.nn import functional as F
 from torchvision import datasets, transforms
+import pandas as pd
+import numpy as np
+import pickle
+
+import os
 #MAIN CODE IS FROM VAE - just edited to match purposes of this
 
 def develop_dataset(config):
@@ -17,10 +22,10 @@ def develop_dataset(config):
     #****CHANGE THIS SO ONLY USING ORIGINAL FILE AND LABEL IS GIVEN AS A COLUMN
 
     #original file contains left column of id, top row gene name< following rows normalized gene data
-    ORIGINAL_FILE = "./data/{0}_811_{1}.csv".format(config.model_type,WHAT_OMICS)
+    ORIGINAL_FILE = "./data/{0}_811_mrna.csv".format(config.model_type)
 
     #develop the pickle file path name (Ex. lasso_811_mrna_formatted.pickle)
-    PICKLE_PATH = "./data/{0}_811_{1}_labels.pickle".format(config.model_type, WHAT_OMICS)
+    PICKLE_PATH = "./data/{0}_811mrna_labels.pickle".format(config.model_type)
         ##RACHEL:**may just eb able to change to match pickle name
     #RACHEL: if the pickle file has not been made yet, make one
     if not os.path.isfile(PICKLE_PATH):
@@ -45,6 +50,8 @@ def develop_dataset(config):
         df_train = df.loc[df['Fold@811'] == 0] #pull out rows where
         df_valid = df.loc[df['Fold@811'] == 1]
         df_test = df.loc[df['Fold@811'] == 2]
+        # print("train:")
+        # print(df_train)
 
         # print(df_train.columns)
         #RACHEL: get the data and labels???
@@ -65,10 +72,11 @@ def develop_dataset(config):
             data_dict['test'][omic] = np.array(data_dict['test'][omic].values).astype('float64')
             data_dict['train'][omic + '_label'] = np.array(data_dict['train'][omic + '_label'].values).astype('float64')
             data_dict['valid'][omic + '_label'] = np.array(data_dict['valid'][omic + '_label'].values).astype('float64')
-            data_dict['test'][omic + '_label'] = np.array(data_dict['test'][omic + '_mask'].values).astype('float64')
+            data_dict['test'][omic + '_label'] = np.array(data_dict['test'][omic + '_label'].values).astype('float64')
 
         with open(PICKLE_PATH, "wb") as handle:
             #RACHEL: write to file level
+            # print(data_dict)
             pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     with open(PICKLE_PATH, "rb") as handle:
@@ -86,7 +94,7 @@ def develop_dataset(config):
 
 class Torch_Dataset:
     def __init__(self, X, y):
-        self.X, self.y = X, int(y)
+        self.X, self.y = X, [int(z) for z in y]
         self.num_samples = self.X.size()[0]
 
     #UNCOMMENT AND USE IF DECIDE TO TRY K-FOLD VALIDATION
@@ -121,9 +129,9 @@ def get_data(config):
     #define x/y for train, validation and test data
     x_train = torch.tensor(dataset['train'][omic_type], dtype=torch.float32)
     y_train = torch.tensor(dataset['train'][omic_type + '_label'], dtype=torch.float32)
-    x_valid = torch.tensor(dataset['valid'][omic_type], dtype=torch.float32).to(device)
+    x_valid = torch.tensor(dataset['valid'][omic_type], dtype=torch.float32)
     y_valid = torch.tensor(dataset['valid'][omic_type + '_label'], dtype=torch.float32)
-    x_test = torch.tensor(dataset['test'][omic_type], dtype=torch.float32).to(device)
+    x_test = torch.tensor(dataset['test'][omic_type], dtype=torch.float32)
     y_test = torch.tensor(dataset['test'][omic_type + '_label'], dtype=torch.float32)
 
     #combine the x and y data into a class Torch_Dataset for processing with the torch model

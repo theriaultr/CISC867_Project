@@ -7,18 +7,21 @@ import argparse
 parser = argparse.ArgumentParser()
 
 #set up the parameters that need to be set when running the model
-parser.add_argument('--model_type', 'mt', type=str, default='lasso') #options lasso or vae
-parser.add_argument('--nodes_hidden_1', 'nh1', type=int, default=512)
-parser.add_argument('--nodes_hidden_2', 'nh2', type=int, default=128)
-parser.add_argument('--nodes_hidden_3', 'nh3', type=int, default=32)
+parser.add_argument('--model_type', '-mt', type=str, default='lasso') #options lasso or vae
+parser.add_argument('--nodes_hidden_1', '-nh1', type=int, default=512)
+parser.add_argument('--nodes_hidden_2', '-nh2', type=int, default=128)
+parser.add_argument('--nodes_hidden_3', '-nh3', type=int, default=32)
+parser.add_argument('--num_outputs', '-no', type=int, default=5)
+
 #out is always 5
-parser.add_argument('--learning_rate', 'lr', type=float, default=0.001)
-parser.add_argument('--max_epochs', '-mx', type=int, default=500)
+parser.add_argument('--learning_rate', '-lr', type=float, default=0.001)
+parser.add_argument('--max_epochs', '-mx', type=int, default=10)
 parser.add_argument('--dropout_rate', '-dr', type=float, default=0.0)
-parser.add_argument('--batch_size', '-bsi', type=int, default=64)
+parser.add_argument('--batch_size', '-bsi', type=int, default=5)
 parser.add_argument('--momentum', '-bs', type=float, default = 0.9)
 parser.add_argument('--patience', '-p', type=int, default = 5)
-parser.add_argument('--num_folds', 'nf', type=int, default = 10)
+parser.add_argument('--num_folds', '-nf', type=int, default = 10)
+parser.add_argument('--omic_list', '-ol', nargs='+', type=str, default = 'mrna@')
 
 #ADD SAVE_PATH
 config = parser.parse_args()
@@ -33,7 +36,7 @@ def run_session(config):
     if config.model_type == 'lasso':
 
         #NOTE: may want to switch to 10-fold cross validation (train and test 10 models and take average loss w/ no validation set)
-        lasso_model = ANN_Lasso(config)
+        lasso_model = ANN_Lasso(config, 1000)
         test_loss = lasso_model.fit_predict(train, valid, test)
         #print the final RMSE values (currently just mse)
         print('RMSE Loss\t{0:0.4f}\t{1:0.4f}\t{2:0.4f}'.format(math.sqrt(lasso_model.global_train_loss), math.sqrt(lasso_model.global_valid_loss), math.sqrt(test_loss)))

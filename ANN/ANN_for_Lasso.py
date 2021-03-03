@@ -1,9 +1,11 @@
 import torch
-import torch.nn as nn
+from torch import nn, optim
+# import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+from tqdm import trange
 
-class ANN_Lasso(nn.module):
+class ANN_Lasso(nn.Module):
 #This class is run to process input data that only includes features seleced from ANN_Lasso
 #The network predicts cancer stage (control, stage i, stage ii, stage iii, stage iv)
     def __init__(self, config, num_features):
@@ -29,25 +31,28 @@ class ANN_Lasso(nn.module):
         self.num_since_best_valid_loss = 0.0
         self.patience = config.patience
 
-        super(ANN_Genes, self).__init__()
+        super(ANN_Lasso, self).__init__()
 
         #define the layers of the model (when onl considering genetoc data)
         self.network = nn.Sequential(
             nn.Linear(num_features, self.nodes_hidden_1),
-            nn.Tanh,
-            nn.Dropout(self.dropout_rate)
+            nn.Tanh(),
+            nn.Dropout(self.dropout_rate),
             nn.Linear(self.nodes_hidden_1, self.nodes_hidden_2),
-            nn.Tanh,
-            nn.Dropout(self.dropout_rate)
+            nn.Tanh(),
+            nn.Dropout(self.dropout_rate),
             nn.Linear(self.nodes_hidden_2, self.nodes_hidden_3),
-            nn.Tanh,
+            nn.Tanh(),
             nn.Dropout(self.dropout_rate),
             nn.Linear(self.nodes_hidden_3, self.nodes_output) #returns 5 outputs
         )
 
     def init_layers(self):
         #all layers will be initialized using xavier_normal
-        nn.init.xavier_normal(network)
+        nn.init.xavier_normal(self.network[0].weight.data)#linear layer 1
+        nn.init.xavier_normal(self.network[3].weight.data) #linear layer 2
+        nn.init.xavier_normal(self.network[6].weight.data)#linear layer 3
+        nn.init.xavier_normal(self.network[9].weight.data) #linear layer 4(out)
 
     def forward(self, x):
         #This funtion defines how forward propogration occurs throughout the network
@@ -65,14 +70,13 @@ class ANN_Lasso(nn.module):
         #MAY NEED TO EDIT WHAT TRAINSET IS AND THE FORMAT IT IS IN...
 
         train_RMSE = []
-		valid_RMSE = []
+        valid_RMSE = []
 
         # #make a confusion matrix of targets as columns and predictions as rows (the calculate sensitvity at end)
-        # conf_mat_train = torch.zeros(self.nodes_output, self.nodes_output)
-        # conf_mat_valid = torch.zeros(self.nodes_output, self.nodes_output)
+        conf_mat_train = torch.zeros(self.nodes_output, self.nodes_output)
+        conf_mat_valid = torch.zeros(self.nodes_output, self.nodes_output)
 
-
-		self.init_layers()
+        self.init_layers()
         print(self)
 
         #define the optimizer and loss criteria (cross entropy)
@@ -80,15 +84,15 @@ class ANN_Lasso(nn.module):
         criterion = nn.CrossEntropyLoss()
 
         batch_num = int(trainset.num_samples / self.batch_size) if self.batch_size != 0 else 1
-		batch_val = int(validset.num_samples / self.batch_size) if self.batch_size != 0 else 1
+        batch_val = int(validset.num_samples / self.batch_size) if self.batch_size != 0 else 1
 
         #this variable is to keep track of how long it has been since the model
         #has improved (stopped after haven't improved in patience number of epochs)
         no_improvement = 0
 
-		#RACHEL:set each epoch
-		t = trange(self.max_epochs + 1, desc='Training...')
-		for epoch in t:
+        t = trange(self.max_epochs + 1, desc='Training...')
+
+        for epoch in t:
 
             #check if the model has not improved in patience number of times
             if no_improvement == self.patience:
@@ -99,21 +103,21 @@ class ANN_Lasso(nn.module):
             conf_mat_valid*=0
 
 			# self.batch_flag = False
-			#put the model in training mode
-			self.train()
+			#put the model in training model
+            self.train()
 
 			#if using batches
-			if self.batch_size != 0:
-				# BATCH-WISE TRAINING PHASE
-				self.global_train_loss, self.global_valid_loss = 0.0, 0.0
+            if self.batch_size != 0:
+                # BATCH-WISE TRAINING PHAS
+                self.global_train_loss, self.global_valid_loss = 0.0, 0.0
 				#train one batch at a time
-				for b in range(batch_num):
-					#calculate indices for the batch
-					i, j = (self.batch_size * b) % trainset.num_samples, (self.batch_size * (b+1)) % trainset.num_samples
+                for b in range(batch_num):
+					#calculate indices for the batches
+                    i, j = (self.batch_size * b) % trainset.num_samples, (self.batch_size * (b+1)) % trainset.num_samples
 					#make sure the model is in training mode
-					self.train()
+                    self.train()
 					#get the output of all samples (5 column tensor)
-					result = self(trainset.X[i:j,:])
+                    result = self(trainset.X[i:j,:])
                     loss = criterion(result, trainset.y[i:j]) #expects y to be integer, result is everythibg
 
                     #loop through the predicted and actual values and add to the confusion matrix accordingly
@@ -123,13 +127,13 @@ class ANN_Lasso(nn.module):
                         conf_mat_train[predicted, actual] += 1
 
                     #calculate the total
-					self.global_train_loss += loss.item() * self.batch_size
+                    self.global_train_loss += loss.item() * self.batch_size
                     #set the gradients to 0 so can backpropogate
-					optimizer.zero_grad()
+                    optimizer.zero_grad()
 					#back propogate to comput the gradients of the model
-					loss.backward()
+                    loss.backward()
 					#update the model based on gradients
-					optimizer.step()
+                    optimizer.step()
                 #end of batch
                 # #Keep this section???********************************************
                 # #determine the number of samples in each batch
@@ -151,11 +155,11 @@ class ANN_Lasso(nn.module):
             #if the validation set is not none
             if validset is not None:
                 #make sure not to use gradient during validation
-				with torch.no_grad():
+                with torch.no_grad():
                     #make sure the model is in evaluation mode
-					model.eval()
-                    #perform a forward pass using the validation data
-					result = self(validset.X)
+                    model.eval()
+                    #perform a forward pass using the validation dat
+                    result = self(validset.X)
                     vloss = criterion(result, validset.y) #expects y to be integer, result is everythibg
 
                     #loop through the predicted and actual values and add to the confusion matrix accordingly
@@ -165,47 +169,47 @@ class ANN_Lasso(nn.module):
                         conf_mat_valid[predicted, actual] += 1
 
                     #make sure there are not NaNs in the results
-					assert torch.isnan(vloss).sum().sum() != 1
+                    assert torch.isnan(vloss).sum().sum() != 1
                     #add to the global validation loss
-					self.global_valid_loss = vloss.item()
+                    self.global_valid_loss = vloss.item()
 
                     #average the training set loss for the number of samples (because of multiplication earlier)
-					if self.batch_size != 0:
+                    if self.batch_size != 0:
                         lb = trainset.num_samples % self.batch_size
-						# self.global_train_loss /= trainset.num_samples
+    					# self.global_train_loss /= trainset.num_samples
                         self.global_train_loss /= lb
 
-					#save the model if the (same way as VAE)***********
-					SAVE_PATH = '{}best_model'.format(self.save_path)
-					if self.global_valid_loss < self.best_valid_loss:
+    				#save the model if the (same way as VAE)***********
+                    SAVE_PATH = '{}best_model'.format(self.save_path)
+                    if self.global_valid_loss < self.best_valid_loss:
                         no_improvement = 0
                         self.best_valid_loss = float(self.global_valid_loss)
                         print("IMPROVED!")
                         print(self.best_valid_loss)
-						# torch.save({'epoch': epoch,
-						# 			'model_state_dict': model.state_dict(),
-						# 			'optimizer_state_dict': optimizer.state_dict()}, SAVE_PATH)
-						# self.write_best_loss()
-						# self.best_valid_flag = True
+    					# torch.save({'epoch': epoch,
+    					# 			'model_state_dict': model.state_dict(),
+    					# 			'optimizer_state_dict': optimizer.state_dict()}, SAVE_PATH)
+    					# self.write_best_loss()
+    					# self.best_valid_flag = True
                     else:
                         no_improvement +=1
 
 
-            #Add training and validation loss to keep track (will plot at end)
-			train_RMSE.append(self.global_train_loss)
-			valid_RMSE.append(self.global_valid_loss)
+            #Add training and validation loss to keep track (will plot at end
+            train_RMSE.append(self.global_train_loss)
+            valid_RMSE.append(self.global_valid_loss)
 
 
         #end epochs (either because reched max epochs or reached patience)
         #plot the training and validation error on the same figure
         plt.figure
-    	plt.plot([x for x in range(1,len(train_RMSE)+1)], train_RMSE)
-    	plt.plot([x for x in range(1,len(train_RMSE)+1)], valid_RMSE)
-    	plt.title("")
-    	plt.xlabel("Epoch")
-    	plt.ylabel("RMSE")
-    	plt.legend(['Train', 'Validation'])
-    	plt.show()
+        plt.plot([x for x in range(1,len(train_RMSE)+1)], train_RMSE)
+        plt.plot([x for x in range(1,len(train_RMSE)+1)], valid_RMSE)
+        plt.title("")
+        plt.xlabel("Epoch")
+        plt.ylabel("RMSE")
+        plt.legend(['Train', 'Validation'])
+        plt.show()
         self.conf_mat_train = conf_mat_train
         self.conf_mat_valid = conf_mat_valid
 
@@ -214,35 +218,34 @@ class ANN_Lasso(nn.module):
     #end fit functions
 
     #Test the model using the predict function
-	def predict(self, dataset): #VAE code has a model option here
+    def predict(self, dataset): #VAE code has a model option here
         #set the initial loss
-		loss = 0.0
+        loss = 0.0
 		#determine how many batches needed
         criterion = nn.CrossEntropyLoss()
         conf_mat = torch.zeros(self.nodes_output, self.nodes_output)
-
-		with torch.no_grad():
+        with torch.no_grad():
 			#put the model into evaluation mode (turn off dropout etc.)
-			self.eval()
+            self.eval()
 			#calculate the loss of the model
             result = self(dataset.X)
             vloss = criterion(result, dataset.y)
-			loss = vloss.item()
+            loss = vloss.item()
             for idx, x in enumerate(result):
                 predicted = torch.softmax(x, dim=1)
                 actual = dataset.y[idx]
                 conf_mat[predicted, actual] += 1
 
-        self.conf_mat_test = conf_mat
+            self.conf_mat_test = conf_mat
 		#RACHEL:return average loss
-		return loss, conf_mat
+        return loss, conf_mat
 
-def fit_predict(self, trainset, validset, testset):
-    '''
-    The purpose of this function is to fit the model using training and VALIDATION
-    data, then using the final model, predict on the testing data
-    '''
-    print("----------TRAINING-----------")
-    model = self.fit(trainset, validset)
-    print("----------TESTING------------")
-    return self.predict(testset)
+    def fit_predict(self, trainset, validset, testset):
+        '''
+        The purpose of this function is to fit the model using training and VALIDATION
+        data, then using the final model, predict on the testing data
+        '''
+        print("----------TRAINING-----------")
+        model = self.fit(trainset, validset)
+        print("----------TESTING------------")
+        return self.predict(testset)
