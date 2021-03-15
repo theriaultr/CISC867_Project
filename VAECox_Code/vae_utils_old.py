@@ -40,16 +40,7 @@ def cancer_list(key):
     return cancer_list_dict[key]
 
 #RACHEL: Access the dataset
-#RACHEL: This function has been edited to load in the data fromk multiple datasets.
 def get_dataset_811(config):
-    '''RACHEL
-    The purpose of this function has been edited to add all files to a dictionary, pickle files are not saved
-    POTENTIAL EDIT: save pikle file for the dataset in use
-    Args:
-        config: configuartion for the model(set in vae_main.py)
-    Returns:
-        data_dict: duictionary with keys train, test and validation
-    '''
     #RACHEL:initialize data dictionary for training, validation, testing, and coo
     data_dict = {
         'train': dict(),
@@ -59,99 +50,104 @@ def get_dataset_811(config):
     }
 
     #RACHEL: PUT THIS IN A LOOP SO CAN LOOP THROUGH ALL OF THE CANCERS (ADD THE NAME TO THE FRONT OF BOTH FILES)
-
-    #TO-DO:
-        #NEED TO CHANGE THE FOR LOOP TO APPENDING TO THE LOOP INSTEAD RECREATING THE INDEX.
+    #NEED TO CHANGE THE FOR LOOP TO APPENDING TO THE LOOP INSTEAD RECREATING THE INDEX.
 
     file_names = cancer_list('test')
-    print("File names are:")
-    print(file_names)
 
-    #RACHEL: Add each cancer in the list to the data dictionary, dividing a subset of each into training adn testing
-    for idx, cancer_name in enumerate(file_names):
-        print("working on Dataset: ")
-        print(cancer_name)
+    # for cancer_name in cancer_list
 
-        WHAT_OMICS = "_".join(config.omic_list) #RACHEL: omic_list is option in config
-        #RACHEL:original file contains left column of id, top row gene name< following rows normalized gene data
-        # ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
 
-        ORIGINAL_FILE = "./data/Rachel_VAE_Data/{0}_{1}_811_{2}.csv".format(cancer_name, config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
-        #RACHEL: this file contains left column patient id, top row genes< following rows whether or not gene is included
-        # MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
 
-        MASKING_FILE = "./data/Rachel_VAE_Data/{0}_{1}_{2}.csv".format(cancer_name, config.vae_data,WHAT_OMICS)
+    WHAT_OMICS = "_".join(config.omic_list) #RACHEL: omic_list is option in config
+    #RACHEL:original file contains left column of id, top row gene name< following rows normalized gene data
+    # ORIGINAL_FILE = "./data/{0}_811_{1}.tsv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
 
+    ORIGINAL_FILE = "./data/{0}_811_{1}.csv".format(config.vae_data,WHAT_OMICS) #RACHEL: vae_data is option in config - default='ember_libfm_190507', type=str
+    #RACHEL: this file contains left column patient id, top row genes< following rows whether or not gene is included
+    # MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
+
+    MASKING_FILE = "./data/{0}_{1}_binary.csv".format(config.vae_data,WHAT_OMICS)
+
+    #RACHEL: develop the pickle file oath name based on run_time system information
+    PICKLE_PATH = "./data/{0}_811_{1}_{2}_{3}_{4}_{5}.pickle".format(config.vae_data, config.gcn_mode, config.feature_scaling, config.feature_selection, config.sub_graph, WHAT_OMICS)
+        ##RACHEL:**may just eb able to change to match pickle name
+    #RACHEL: if the pickle file has not been made yet, make one
+    if not os.path.isfile(PICKLE_PATH):
+        print("Making new pickle file...")
+        # Missing Value Handling
+        #RACHEL: read the original file*****
         df = pd.read_csv(ORIGINAL_FILE, sep=",", header=0, index_col=0) #RACHEL: edited to work with csv (Used to be "\t")
-            #RACHEL: read the masking file********
+        #RACHEL: read the masking file********
         mf = pd.read_csv(MASKING_FILE, sep=",", header=0, index_col=0)
-            #RACHEL: re-index labels so match order
+        #RACHEL: re-index labels so match order
         mf = mf.reindex(df.index)
+        print("printing index**********************************:")
+        #RACHEL:this prints the patient ID information (row names) **comment out when run
+        print(df.index)
+        print("printing columns***************************")
+        print(df.columns)
+        print(mf.index)
+        # mf = mf.replace(0,np.nan)
+        # mf = mf.dropna(how='all',axis=0)
+        # mf = mf.dropna(how='all',axis=1)
 
         # df = df.dropna(subset=['Cli@Days2Death', 'Cli@Days2FollowUp'], how='all')
         df.fillna(0.0, axis=1, inplace=True)
 
-            # Dataset Split Train, Valid and Test
-        #RACHEl: dicide the dataset into train, valid and test
+        # Dataset Split Train, Valid and Test
+        temp =df['Fold@811']#RACHEL" Before 'Fold@811'
+        # print("printing Fold@811")
+        # print(temp)
         df_train = df.loc[df['Fold@811'] == 0]
+        print("training index:")
+        print(df_train.index)
+        print("training columns:")
+        print(df_train.columns)
         df_valid = df.loc[df['Fold@811'] == 1]
+        print("valid index:")
+        print(df_valid.index)
         df_test = df.loc[df['Fold@811'] == 2]
+        print("test index:")
+        print(df_test.index)
 
-            # print(df_train.columns)
-            #RACHEL: get the data and labels
-        for omic in config.omic_list: #RACHEL: right now just mRNA@ but acn edit this for multimodal
-            #RACHEL: Add the data to the
+        # print(df_train.columns)
+        #RACHEL: get the data and labels???
+        for omic in config.omic_list:
+            print("omic:*************************************")
+            print(omic)
+            # print(type(data_dict['train'][omic]))
             #RACHEL: pull out gene information (mRNA expression)
-            if idx == 0: #RACHEL the [omic] cnnot be accessed yet so have to creaet in first one
-                #now just need to edit to append get_values
-                data_dict['train'][omic] = df_train[[x for x in df_train.columns if omic in x]] #RACHEL: eliminated get_values()
-                data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns if omic in x]]
-                data_dict['test'][omic] = df_test[[x for x in df_test.columns if omic in x]]
-                    #RACHEL:pull out mask (whether or not to include gene)
-                data_dict['train'][omic + '_mask'] = mf.loc[df_train.index]
-                data_dict['valid'][omic + '_mask'] = mf.loc[df_valid.index]
-                data_dict['test'][omic + '_mask'] = mf.loc[df_test.index]
-            else:
-                #now just need to edit to append get_values
+            data_dict['train'][omic] = df_train[[x for x in df_train.columns if omic in x]] #RACHEL: eliminated get_values()
+            data_dict['valid'][omic] = df_valid[[x for x in df_valid.columns if omic in x]]
+            data_dict['test'][omic] = df_test[[x for x in df_test.columns if omic in x]]
+            #RACHEL:pull out mask (whether or not to include gene)
+            data_dict['train'][omic + '_mask'] = mf.loc[df_train.index]
+            data_dict['valid'][omic + '_mask'] = mf.loc[df_valid.index]
+            data_dict['test'][omic + '_mask'] = mf.loc[df_test.index]
 
-                data_dict['train'][omic] = data_dict['train'][omic].append(df_train[[x for x in df_train.columns if omic in x]]) #RACHEL: eliminated get_values()
-                data_dict['valid'][omic] = data_dict['valid'][omic].append(df_valid[[x for x in df_valid.columns if omic in x]])
-                data_dict['test'][omic] = data_dict['test'][omic].append(df_test[[x for x in df_test.columns if omic in x]])
-                    #RACHEL:pull out mask (whether or not to include gene)
-                data_dict['train'][omic + '_mask'] = data_dict['train'][omic + '_mask'].append(mf.loc[df_train.index])
-                data_dict['valid'][omic + '_mask'] = data_dict['valid'][omic + '_mask'].append(mf.loc[df_valid.index])
-                data_dict['test'][omic + '_mask'] = data_dict['test'][omic + '_mask'].append(mf.loc[df_test.index])
-            print("Cancer type:")
-            print(cancer_name)
-            print("The number of trainnig samples is:")
-            print(df_train[[x for x in df_train.columns if omic in x]].shape)
+        # Dataset Feature Extraction
+        if config.feature_selection is not None:
+            data_dict = _feature_selection(config, data_dict)
 
-
-    # Dataset Feature Extraction
-    if config.feature_selection is not None:
-        data_dict = _feature_selection(config, data_dict)
-
-    #RACHEL: Made it through all cancers
-            # Dataset 'Numpification'
-    for omic in config.omic_list:
-        data_dict['train'][omic] = np.array(data_dict['train'][omic].values).astype('float64')
-        data_dict['valid'][omic] = np.array(data_dict['valid'][omic].values).astype('float64')
-        data_dict['test'][omic] = np.array(data_dict['test'][omic].values).astype('float64')
-        data_dict['train'][omic + '_mask'] = np.array(data_dict['train'][omic + '_mask'].values).astype('float64')
-        data_dict['valid'][omic + '_mask'] = np.array(data_dict['valid'][omic + '_mask'].values).astype('float64')
-        data_dict['test'][omic + '_mask'] = np.array(data_dict['test'][omic + '_mask'].values).astype('float64')
-
+        # Dataset 'Numpification'
+        for omic in config.omic_list:
+            data_dict['train'][omic] = np.array(data_dict['train'][omic].values).astype('float64')
+            data_dict['valid'][omic] = np.array(data_dict['valid'][omic].values).astype('float64')
+            data_dict['test'][omic] = np.array(data_dict['test'][omic].values).astype('float64')
+            data_dict['train'][omic + '_mask'] = np.array(data_dict['train'][omic + '_mask'].values).astype('float64')
+            data_dict['valid'][omic + '_mask'] = np.array(data_dict['valid'][omic + '_mask'].values).astype('float64')
+            data_dict['test'][omic + '_mask'] = np.array(data_dict['test'][omic + '_mask'].values).astype('float64')
 
         # Dataset Feature Scaling - RACHEL: does nothing if set to NONE
         data_dict = _feature_scaling(config, data_dict)
 
-    #     with open(PICKLE_PATH, "wb") as handle:
-    #         #RACHEL: write to file level
-    #         pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    #
-    # with open(PICKLE_PATH, "rb") as handle:
-    #     #RACHEL: read from file
-    #     data_dict = pickle.load(handle)
+        with open(PICKLE_PATH, "wb") as handle:
+            #RACHEL: write to file level
+            pickle.dump(data_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open(PICKLE_PATH, "rb") as handle:
+        #RACHEL: read from file
+        data_dict = pickle.load(handle)
 
     #RACHEL: for each dataset print number of samples in train, validate, and test
     for o in config.omic_list:
