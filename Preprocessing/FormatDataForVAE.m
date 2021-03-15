@@ -69,7 +69,7 @@ end_valid = start_valid+num_valid;
 % %want to create a cell array of size M+1 x N+1
 cell_array_data = cell(M+1, N+2);
 cell_array_data(1,:) = cellstr(gene_names_extended);
-cell_array_data(2:end,1) = cellstr(sample_names);
+cell_array_data(2:end,1) = sample_names; %used to be cellstr
 cell_array_data(2:end, 2:end-1) = num2cell(z_score_gene_expression_data);
 cell_array_data(start_train:end_train, end) = {0};
 cell_array_data(start_valid:end_valid, end) = {1};
@@ -83,12 +83,12 @@ writecell(cell_array_data, file_name_data); %TOO BIG
 %same initial cell array except fill everything with 1
 cell_array_binary = cell(M+1, N+2);
 cell_array_binary(1,:) = cellstr(gene_names); %use gene names with no @mRNA
-cell_array_binary(2:end,1) = cellstr(sample_names);
+cell_array_binary(2:end,1) = sample_names; %used to be cellstr
 cell_array_binary(2:end, 2:end-1) = {1};%place a value 1 in each entry
 cell_array_binary(start_train:end_train, end) = {0};
 cell_array_binary(start_valid:end_valid, end) = {1};
 cell_array_binary(end_valid+1:end, end) = {2};
 
-% writecell(cell_array_binary, file_name_binary);
+writecell(cell_array_binary, file_name_binary);
 
 end
